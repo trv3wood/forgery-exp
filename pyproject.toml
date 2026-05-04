@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forgery-exp"
+version = "0.1.0"
+description = "Simple Rao2016-style image forgery detection experiment."
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "pillow",
+  "matplotlib",
+  "scikit-learn",
+  "tqdm",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
