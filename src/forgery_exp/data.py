@@ -12,6 +12,7 @@ CLASS_NAMES = ["authentic", "forged"]
 
 
 def build_transforms(image_size: int = IMAGE_SIZE, train: bool = False) -> transforms.Compose:
+    # 先放大再裁剪：训练集用随机裁剪增强鲁棒性，验证/测试集用中心裁剪保证结果稳定。
     steps: list[object] = [
         transforms.Resize((image_size + 32, image_size + 32)),
     ]
@@ -29,6 +30,7 @@ def build_transforms(image_size: int = IMAGE_SIZE, train: bool = False) -> trans
     steps.extend(
         [
             transforms.ToTensor(),
+            # 将像素从 [0, 1] 映射到约 [-1, 1]，与训练和预测阶段保持同一输入分布。
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
         ]
     )
@@ -44,6 +46,8 @@ def build_dataset(data_dir: str | Path, split: str, image_size: int = IMAGE_SIZE
         root=split_dir,
         transform=build_transforms(image_size=image_size, train=(split == "train")),
     )
+
+    # ImageFolder 会按文件夹名字排序生成标签，这里固定标签顺序，避免训练和预测类别错位。
     expected = {name: idx for idx, name in enumerate(CLASS_NAMES)}
     if dataset.class_to_idx != expected:
         raise ValueError(
@@ -64,8 +68,8 @@ def build_loader(
     return DataLoader(
         dataset,
         batch_size=batch_size,
+        # 只打乱训练集；验证/测试集保持顺序，便于复现实验和排查样本。
         shuffle=(split == "train"),
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
     )
-

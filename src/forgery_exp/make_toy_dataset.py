@@ -10,11 +10,13 @@ from tqdm import tqdm
 
 
 def smooth_noise(size: int, rng: np.random.Generator) -> Image.Image:
+    # 从低分辨率噪声放大并模糊，生成带有平滑纹理的“原始图像”背景。
     small = rng.integers(0, 256, size=(16, 16, 3), dtype=np.uint8)
     img = Image.fromarray(small, mode="RGB").resize((size, size), Image.Resampling.BICUBIC)
     img = img.filter(ImageFilter.GaussianBlur(radius=1.2))
 
     draw = ImageDraw.Draw(img, mode="RGBA")
+    # 叠加半透明几何块，让图片有可复制粘贴的局部结构。
     for _ in range(rng.integers(3, 8)):
         x0 = int(rng.integers(0, size - 24))
         y0 = int(rng.integers(0, size - 24))
@@ -32,6 +34,7 @@ def make_forged(base: Image.Image, donor: Image.Image, rng: np.random.Generator)
     size = base.size[0]
     forged = base.copy()
 
+    # 随机裁一块源区域，再粘贴到目标位置，模拟 copy-move 或拼接伪造。
     patch_size = int(rng.integers(size // 5, size // 3))
     sx = int(rng.integers(0, size - patch_size))
     sy = int(rng.integers(0, size - patch_size))
@@ -48,6 +51,7 @@ def make_forged(base: Image.Image, donor: Image.Image, rng: np.random.Generator)
 
     forged.paste(patch, (tx, ty))
 
+    # 加一条很淡的边界痕迹，让 toy 数据既可学习，又不会完全靠明显白框分类。
     draw = ImageDraw.Draw(forged, mode="RGBA")
     draw.rectangle(
         [tx, ty, tx + patch_size - 1, ty + patch_size - 1],
@@ -61,6 +65,7 @@ def write_split(output: Path, split: str, count: int, size: int, seed: int) -> N
     rng = np.random.default_rng(seed)
     random.seed(seed)
 
+    # 目录名必须和训练代码中的 CLASS_NAMES 对齐，ImageFolder 会用它们生成标签。
     authentic_dir = output / split / "authentic"
     forged_dir = output / split / "forged"
     authentic_dir.mkdir(parents=True, exist_ok=True)
@@ -95,4 +100,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

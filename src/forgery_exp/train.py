@@ -55,6 +55,7 @@ def run_epoch(
     optimizer: torch.optim.Optimizer | None = None,
 ) -> tuple[float, float, list[int], list[int]]:
     is_train = optimizer is not None
+    # 同一个循环同时服务训练和评估；model.train(False) 等价于 eval()，会关闭 BN/Dropout 的训练行为。
     model.train(is_train)
 
     losses: list[float] = []
@@ -65,6 +66,7 @@ def run_epoch(
         images = images.to(device)
         labels = labels.to(device)
 
+        # 评估阶段不建梯度图，能省显存并避免误更新参数。
         with torch.set_grad_enabled(is_train):
             logits = model(images)
             loss = criterion(logits, labels)
@@ -76,6 +78,7 @@ def run_epoch(
 
         losses.append(float(loss.item()))
         preds = logits.argmax(dim=1)
+        # 指标计算放在 CPU 上做，避免把 sklearn 绑定到 GPU 张量。
         y_true.extend(labels.detach().cpu().tolist())
         y_pred.extend(preds.detach().cpu().tolist())
 
@@ -132,6 +135,7 @@ def plot_samples(
     preds = probs.argmax(dim=1)
 
     images = images.detach().cpu()
+    # 训练时做过 Normalize(mean=0.5, std=0.5)，展示前反归一化回 [0, 1]。
     images = images * 0.5 + 0.5
 
     cols = min(4, len(images))
@@ -187,6 +191,7 @@ def main() -> None:
     best_path = args.output_dir / "best_model.pt"
 
     for epoch in range(1, args.epochs + 1):
+        # 每个 epoch 先更新模型，再用验证集选择最佳 checkpoint。
         train_loss, train_acc, _, _ = run_epoch(model, loaders["train"], criterion, device, optimizer)
         val_loss, val_acc, _, _ = run_epoch(model, loaders["val"], criterion, device)
 
@@ -203,6 +208,7 @@ def main() -> None:
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
+            # 只保存验证集表现最好的权重，避免最后一轮过拟合后覆盖较好的模型。
             torch.save(
                 {
                     "model_state": model.state_dict(),
@@ -213,6 +219,7 @@ def main() -> None:
                 best_path,
             )
 
+    # 测试集只在训练结束后用最佳验证模型评估一次，减少对测试集的调参泄漏。
     checkpoint = torch.load(best_path, map_location=device)
     model.load_state_dict(checkpoint["model_state"])
     test_loss, test_acc, test_true, test_pred = run_epoch(model, loaders["test"], criterion, device)

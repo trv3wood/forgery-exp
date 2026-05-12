@@ -9,3 +9,4 @@ dataset/
 runs/
 *.pt
 *.pth
+.DS_Store

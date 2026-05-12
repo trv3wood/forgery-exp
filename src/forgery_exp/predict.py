@@ -32,10 +32,12 @@ def main() -> None:
     checkpoint = torch.load(args.checkpoint, map_location=device)
     model = build_model(num_classes=len(CLASS_NAMES)).to(device)
     model.load_state_dict(checkpoint["model_state"])
+    # 推理时切到 eval，确保 BatchNorm 使用训练好的统计量。
     model.eval()
 
     transform = build_transforms(image_size=args.image_size, train=False)
     image = Image.open(args.image).convert("RGB")
+    # unsqueeze(0) 添加 batch 维度，让单张图片也能走模型的批处理接口。
     tensor = transform(image).unsqueeze(0).to(device)
 
     with torch.no_grad():
@@ -53,4 +55,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
